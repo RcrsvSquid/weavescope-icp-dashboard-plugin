@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -35,25 +36,8 @@ func setupSignals(socketPath string) {
 	}()
 }
 
-// Report generates a json report consumable by the weavescope application
-func Report(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.URL.String())
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{
-	  "Plugins": [
-		{
-		  "id":          "scope-test",
-		  "label":       "Scope Test",
-		  "description": "Testing the weave scope plugins",
-		  "interfaces":  ["reporter"],
-		  "api_version": "1"
-		}
-	  ]
-	}`))
-}
-
 func main() {
+	// We put the socket in a sub-directory to have more control on the permissions
 	const socketPath = "/var/run/scope/plugins/scope-test/scope-test.sock"
 	hostID, _ := os.Hostname()
 
@@ -73,24 +57,64 @@ func main() {
 	}()
 
 	http.HandleFunc("/report", Report)
-	// http.HandleFunc("/control", Control)
-
 	if err := http.Serve(listener, nil); err != nil {
 		log.Printf("error: %v", err)
 	}
 }
 
-type report struct {
-	Host struct {
-		Nodes           map[string]node           `json:"nodes"`
-		MetricTemplates map[string]metricTemplate `json:"metric_templates"`
-		Controls        map[string]control        `json:"controls"`
+// Report is called by scope when a new report is needed. It is part of the
+// "reporter" interface, which all plugins must implement.
+func Report(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.URL.String())
+
+	raw, err := ioutil.ReadFile("./test.json")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Fatalf("File read error %v", err)
 	}
-	Plugins []struct {
-		ID          string   `json:"id"`
-		Label       string   `json:"label"`
-		Description string   `json:"description,omitempty"`
-		Interfaces  []string `json:"interfaces"`
-		APIVersion  string   `json:"api_version,omitempty"`
-	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(raw)
 }
+
+// func (p *Plugin) getTopologyHost() string {
+// 	return fmt.Sprintf("%s;<host>", p.HostID)
+// }
+
+// type report struct {
+// 	Host struct {
+// 		Nodes struct {
+// 			SidneywWorker2Host struct {
+// 				Latest struct {
+// 					LinkTableMetaData struct {
+// 						Value     string    `json:"value"`
+// 						Timestamp time.Time `json:"timestamp"`
+// 					} `json:"link-table-meta-data"`
+// 				} `json:"latest"`
+// 			} `json:"sidneyw-worker-2;<host>"`
+// 		} `json:"nodes"`
+// 		MetadataTemplates struct {
+// 			LinkMeta struct {
+// 				ID       string  `json:"id"`
+// 				Label    string  `json:"label"`
+// 				DataType string  `json:"dataType"`
+// 				Priority float64 `json:"priority"`
+// 				From     string  `json:"from"`
+// 			} `json:"link-meta"`
+// 		} `json:"metadata_templates"`
+// 		TableTemplates struct {
+// 			LinkTable struct {
+// 				ID     string `json:"id"`
+// 				Label  string `json:"label"`
+// 				Prefix string `json:"prefix"`
+// 			} `json:"link-table"`
+// 		} `json:"table_templates"`
+// 	} `json:"Host"`
+// 	Plugins []struct {
+// 		ID          string   `json:"id"`
+// 		Label       string   `json:"label"`
+// 		Description string   `json:"description"`
+// 		Interfaces  []string `json:"interfaces"`
+// 		APIVersion  string   `json:"api_version"`
+// 	} `json:"Plugins"`
+// }

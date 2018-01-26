@@ -1,30 +1,31 @@
 apiVersion: extensions/v1beta1
-kind: Daemonset
+kind: DaemonSet
 metadata:
-  name: weavescope-test-plugin
   labels:
     app: weavescope
-    weavescope-component: weavescope-test-plugin
+    weavescope-component: weavescope-testiowait-plugin
+  name: weavescope-testiowait-plugin
 spec:
   template:
     metadata:
       labels:
         app: weavescope
-        weavescope-component: weavescope-test-plugin
+        weavescope-component: weavescope-testiowait-plugin
     spec:
       hostPID: true
       hostNetwork: true
       containers:
-        - name: weavescope-test-plugin
-          image: mycluster.icp:8500/weave/scope-test:latest
+        - name: weavescope-testiowait-plugin
+          image: mycluster.icp:8500/default/iowait-modification:latest
+          imagePullPolicy: Always
           securityContext:
             privileged: true
           volumeMounts:
-            - name: scope-plugins
-              mountPath: /var/run/scope/plugins
+          - name: scope-plugins
+            mountPath: /var/run/scope/plugins
+      volumes:
+      - name: scope-plugins
+        hostPath:
+          path: /var/run/scope/plugins
       imagePullSecrets:
         - name: regsecret
-      volumes:
-        - name: scope-plugins
-          hostPath:
-            path: /var/run/scope/plugins
