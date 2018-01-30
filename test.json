@@ -3,10 +3,6 @@
       "nodes": {
         "sidneyw-worker-2;<host>": {
             "latest": {
-              "link-table-nodes": {
-                "value": "https://9.37.239.34:8443/console/platform/nodes",
-                "timestamp": "2016-11-17T08:53:02.189193735Z"
-              },
               "table-id-1___table-column-id-1": {
                 "value": "https://9.37.239.34:8443/console/platform/nodes",
                 "timestamp": "2016-11-17T08:53:02.189193735Z"
@@ -15,27 +11,16 @@
         }
       },
       "metadata_templates": {
-        "link-meta": {
-          "id": "link-table-meta-data",
-          "label": "ICP Dashboard",
-          "dataType": "ip",
-          "priority": 1,
-          "from": "latest"
-        },
         "multicolumn-meta": {
           "id": "table-id-meta",
           "label": "multicolumn-links",
           "dataType": "",
-          "priority": 2,
+          "format": "link",
+          "priority": "0.1",
           "from": "latest"
         }
       },
       "table_templates": {
-        "link-table": {
-          "id": "link-table",
-          "label": "Dashboard",
-          "prefix": "link-table-"
-        },
         "multi-column": {
           "id": "table-id",
           "label": "",
