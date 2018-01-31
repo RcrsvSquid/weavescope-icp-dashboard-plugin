@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/apps/v1"
+	types "k8s.io/apimachinery/pkg/types"
 )
 
 var formatStrings = map[string]string{
@@ -16,16 +17,19 @@ var formatStrings = map[string]string{
 }
 
 type K8SObject interface {
+	GetUID() types.UID
 	GetName() string
 	GetNamespace() string
 }
 
 type Host struct {
+	UID  types.UID
 	Name string
 	IP   string
 }
 
 func (h *Host) GetName() string      { return h.Name }
+func (h *Host) GetUID() types.UID    { return h.UID }
 func (h *Host) GetNamespace() string { return h.IP }
 
 func GetOutboundIP() string {
@@ -65,7 +69,7 @@ func GetWeaveID(obj K8SObject) (string, error) {
 	// case Pod:
 	// 	return fmt.Sprintf("%s;<pod>", obj.GetName())
 	case *v1.Deployment:
-		return fmt.Sprintf("%s;<deployment>", obj.GetName()), nil
+		return fmt.Sprintf("%s;<deployment>", obj.GetUID()), nil
 	}
 
 	return "", fmt.Errorf("No Compatible Type Found")

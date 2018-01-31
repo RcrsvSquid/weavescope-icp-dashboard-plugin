@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	v1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 type PluginSpec struct {
@@ -80,6 +85,12 @@ type Plugin struct {
 	Report   WeaveReport
 }
 
+func prettyprint(b []byte) ([]byte, error) {
+	var out bytes.Buffer
+	err := json.Indent(&out, b, "", "  ")
+	return out.Bytes(), err
+}
+
 func (p *Plugin) HandleReport(w http.ResponseWriter, r *http.Request) {
 	rpt := p.GenerateReport()
 
@@ -88,6 +99,9 @@ func (p *Plugin) HandleReport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		log.Fatalf("JSON Marshall Error %v", err)
 	}
+
+	jsonIndented, _ := prettyprint(raw)
+	fmt.Printf("%s\n", jsonIndented)
 
 	w.WriteHeader(http.StatusOK)
 	w.Write(raw)
@@ -107,26 +121,32 @@ func (p *Plugin) GenerateReport() WeaveReport {
 
 	p.Report.AddToReport(hostNode)
 
-	// config, err := rest.InClusterConfig()
-	// if err != nil {
-	// 	panic(err.Error())
-	// }
-	// // creates the clientset
-	// clientset, err := kubernetes.NewForConfig(config)
-	// if err != nil {
-	// 	panic(err.Error())
-	// }
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		panic(err.Error())
+	}
 
-	// deployments, err := clientset.Apps().Deployments("").List(metav1.ListOptions{})
-	// if err != nil {
-	// 	panic(err.Error())
-	// }
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
 
-	// for _, deployment := range deployments.Items {
-	// 	fmt.Println(deployment.GetName())
-	// }
+	deployments, err := clientset.Apps().Deployments("").List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
 
-	// fmt.Printf("There are %d deployments in the cluster\n", len(deployments.Items))
+	fmt.Printf("There are %d deployments in the cluster\n", len(deployments.Items))
+
+	for _, deployment := range deployments.Items {
+		p.Report.AddToReport(&deployment)
+	}
+
+	// p.Report.AddToReport(&deployments.Items[0])
+	// fmt.Printf("Deployment Name%s\n", deployments.Items[0].GetName())
+	// fmt.Println(deployments.Items[0].GetUID())
+	// fmt.Println("\n\n")
 
 	return p.Report
 }

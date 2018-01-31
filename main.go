@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -49,22 +47,6 @@ func main() {
 	if err := http.Serve(listener, nil); err != nil {
 		log.Printf("error: %v", err)
 	}
-
-	// rpt := plugin.GenerateReport()
-
-	// raw, err := json.Marshal(&rpt)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// jsonIndented, _ := prettyprint(raw)
-	// fmt.Printf("%s", jsonIndented)
-}
-
-func prettyprint(b []byte) ([]byte, error) {
-	var out bytes.Buffer
-	err := json.Indent(&out, b, "", "  ")
-	return out.Bytes(), err
 }
 
 func setupSocket(socketPath string) (net.Listener, error) {
