@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,8 +11,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
-
-	weave "github.ibm.com/sidney-wijngaarde1/weave-scope-plugin/weaveplugin"
 )
 
 func main() {
@@ -19,7 +18,7 @@ func main() {
 	const socketPath = "/var/run/scope/plugins/icp-dashboard/icp-dashboard.sock"
 	hostID, _ := os.Hostname()
 
-	fmt.Printf("Current Host IP %s\n", weave.GetOutboundIP())
+	fmt.Printf("Current Host IP %s\n", GetOutboundIP())
 
 	// Handle the exit signal
 	setupSignals(socketPath)
@@ -36,52 +35,36 @@ func main() {
 		os.RemoveAll(filepath.Dir(socketPath))
 	}()
 
-	http.HandleFunc("/report", Report)
-	if err := http.Serve(listener, nil); err != nil {
-		log.Printf("error: %v", err)
-	}
-}
-
-// Report is called by scope when a new report is needed. It is part of the
-// "reporter" interface, which all plugins must implement.
-func Report(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.URL.String())
-
-	var rpt *weave.WeaveReport = &weave.WeaveReport{}
-
-	rpt.Plugins = []weave.PluginSpec{{
+	var plugin *Plugin = &Plugin{
 		ID:          "icp-dashboard",
 		Label:       "ICP Dashboard",
 		Description: "Links into the ICP Dashboard",
 		Interfaces:  []string{"reporter"},
 		APIVersion:  1,
-	}}
 
-	var hostNode *weave.Host = &weave.Host{}
-	hostNode.Init()
-
-	rpt.Host = weave.Topology{
-		Nodes: map[string]weave.Node{
-			weave.GetWeaveID(hostNode): weave.Node{
-				Latest: weave.GetLatestURL(hostNode),
-			},
-		},
-		MetadataTemplates: map[string]weave.Metadata{
-			weave.GetMetaDataTableID(hostNode): weave.GetWeaveMetaData(hostNode),
-		},
-		TableTemplates: map[string]weave.Table{
-			hostNode.GetTableID(): weave.GetWeaveTable(hostNode),
-		},
+		Controls: Controls{false, false},
 	}
 
-	raw, err := json.Marshal(rpt)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Fatalf("JSON Marshall Error %v", err)
+	http.HandleFunc("/report", plugin.HandleReport)
+	if err := http.Serve(listener, nil); err != nil {
+		log.Printf("error: %v", err)
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write(raw)
+	// rpt := plugin.GenerateReport()
+
+	// raw, err := json.Marshal(&rpt)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// jsonIndented, _ := prettyprint(raw)
+	// fmt.Printf("%s", jsonIndented)
+}
+
+func prettyprint(b []byte) ([]byte, error) {
+	var out bytes.Buffer
+	err := json.Indent(&out, b, "", "  ")
+	return out.Bytes(), err
 }
 
 func setupSocket(socketPath string) (net.Listener, error) {

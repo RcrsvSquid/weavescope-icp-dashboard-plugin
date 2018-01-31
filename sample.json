@@ -1,10 +1,10 @@
 {
   "Host": {
       "nodes": {
-        "sidneyw-worker-2;<host>": {
+        "sidneywijn-worker-2;<host>": {
             "latest": {
               "table-id-1___table-column-id-1": {
-                "value": "https://9.37.239.34:8443/console/platform/nodes",
+                "value": "https://9.37.39.21:8443/console/platform/nodes",
                 "timestamp": "2016-11-17T08:53:02.189193735Z"
               }
             }
