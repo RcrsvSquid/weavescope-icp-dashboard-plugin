@@ -2,7 +2,7 @@
 set -ex
 
 TAG=${1:-latest}
-IMAGE_NAME="mycluster.icp:8500/default/iowait-modification:$TAG"
+export IMAGE_NAME="mycluster.icp:8500/default/weavescope-icp-dashboard-plugin:$TAG"
 
 CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 

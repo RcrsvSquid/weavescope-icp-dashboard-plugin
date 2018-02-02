@@ -12,16 +12,24 @@ import (
 )
 
 func main() {
-	// We put the socket in a sub-directory to have more control on the permissions
-	const socketPath = "/var/run/scope/plugins/icp-dashboard/icp-dashboard.sock"
-	hostID, _ := os.Hostname()
+	var plugin *Plugin = &Plugin{
+		ID:          "icp-dashboard",
+		Label:       "ICP Dashboard",
+		Description: "Links into the ICP Dashboard",
+		Interfaces:  []string{"reporter"},
+		APIVersion:  1,
 
-	fmt.Printf("Current Host IP %s\n", GetOutboundIP())
+		Controls: Controls{false, false},
+	}
+
+	hostID, _ := os.Hostname()
+	log.Printf("Starting on %s...\n", hostID)
+
+	// We put the socket in a sub-directory to have more control on the permissions
+	socketPath := fmt.Sprintf("/var/run/scope/plugins/%s/%s.sock", plugin.ID, plugin.ID)
 
 	// Handle the exit signal
 	setupSignals(socketPath)
-
-	log.Printf("Starting on %s...\n", hostID)
 
 	listener, err := setupSocket(socketPath)
 	if err != nil {
@@ -32,16 +40,6 @@ func main() {
 		listener.Close()
 		os.RemoveAll(filepath.Dir(socketPath))
 	}()
-
-	var plugin *Plugin = &Plugin{
-		ID:          "icp-dashboard",
-		Label:       "ICP Dashboard",
-		Description: "Links into the ICP Dashboard",
-		Interfaces:  []string{"reporter"},
-		APIVersion:  1,
-
-		Controls: Controls{false, false},
-	}
 
 	http.HandleFunc("/report", plugin.HandleReport)
 	if err := http.Serve(listener, nil); err != nil {

@@ -6,20 +6,24 @@ import (
 	"os"
 	"strings"
 
-	v1 "k8s.io/api/apps/v1"
+	app_v1 "k8s.io/api/apps/v1"
+	core_v1 "k8s.io/api/core/v1"
 	types "k8s.io/apimachinery/pkg/types"
 )
 
 var formatStrings = map[string]string{
-	"host":       "/console/platform/nodes/%v",                   // ip
-	"deployment": "/console/workloads/deployments/%s/%s",         // namespace, deployment
-	"pod":        "/console/workloads/deployments/%s/%s/pods/%s", // namespace, deployment, pod
+	"host":       "/console/platform/nodes/%v",           // ip
+	"deployment": "/console/workloads/deployments/%s/%s", // namespace, deployment
+	"daemon_set": "/console/workloads/daemonsets/%s/%s",  // namespace, daemonset
+	// "pod":        "/console/workloads/deployments/%s/%s/pods/%s", // namespace, deployment, pod
+	"pod": "/console/workloads/deployments/%s/%s/pods", // namespace, deployment, pod
 }
 
 type K8SObject interface {
 	GetUID() types.UID
 	GetName() string
 	GetNamespace() string
+	GetLabels() map[string]string
 }
 
 type Host struct {
@@ -28,9 +32,10 @@ type Host struct {
 	IP   string
 }
 
-func (h *Host) GetName() string      { return h.Name }
-func (h *Host) GetUID() types.UID    { return h.UID }
-func (h *Host) GetNamespace() string { return h.IP }
+func (h *Host) GetName() string              { return h.Name }
+func (h *Host) GetUID() types.UID            { return h.UID }
+func (h *Host) GetNamespace() string         { return h.IP }
+func (h *Host) GetLabels() map[string]string { return map[string]string{} }
 
 func GetOutboundIP() string {
 	conn, _ := net.Dial("udp", "8.8.8.8:80")
@@ -49,12 +54,22 @@ func (h *Host) Init() {
 	h.IP = GetOutboundIP()
 }
 
+// TODO: Take BaseUrl as the first param
 func GetPlatformUrl(obj K8SObject) (string, error) {
 	switch obj.(type) {
 	case *Host:
 		return fmt.Sprintf(formatStrings["host"], obj.GetNamespace()), nil
-	case *v1.Deployment:
+
+	case *app_v1.Deployment:
 		return fmt.Sprintf(formatStrings["deployment"], obj.GetNamespace(), obj.GetName()), nil
+
+	case *app_v1.DaemonSet:
+		return fmt.Sprintf(formatStrings["daemon_set"], obj.GetNamespace(), obj.GetName()), nil
+
+	// TODO: Fix this link
+	case *core_v1.Pod:
+		return fmt.Sprintf(formatStrings["pod"], obj.GetNamespace(), obj.GetName()), nil
+
 	default:
 		return "", fmt.Errorf("No Compatible Type Found")
 	}
@@ -68,11 +83,18 @@ func GetWeaveID(obj K8SObject) (string, error) {
 		return fmt.Sprintf("%s;<host>", obj.GetName()), nil
 	// case Pod:
 	// 	return fmt.Sprintf("%s;<pod>", obj.GetName())
-	case *v1.Deployment:
+	case *app_v1.Deployment:
 		return fmt.Sprintf("%s;<deployment>", obj.GetUID()), nil
-	}
 
-	return "", fmt.Errorf("No Compatible Type Found")
+	case *app_v1.DaemonSet:
+		return fmt.Sprintf("%s;<daemonset>", obj.GetUID()), nil
+
+	case *core_v1.Pod:
+		return fmt.Sprintf("%s;<pod>", obj.GetUID()), nil
+
+	default:
+		return "", fmt.Errorf("No Compatible Type Found")
+	}
 }
 
 func GetWeaveTable(obj K8SObject) (id string, table Table) {
