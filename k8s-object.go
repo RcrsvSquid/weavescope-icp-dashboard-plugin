@@ -108,7 +108,7 @@ func GetWeaveTable(obj K8SObject) (id string, table Table) {
 		Columns: []TableColumn{{
 			ID:       fmt.Sprintf("%s-column-1", GetTableID(obj)),
 			Label:    "ICP Link",
-			DataType: "",
+			DataType: "link",
 		}},
 	}
 
@@ -121,7 +121,7 @@ func GetWeaveMetaData(obj K8SObject) (id string, metadata Metadata) {
 	metadata = Metadata{
 		ID:       id,
 		Label:    "Multi-Column Links",
-		DataType: "",
+		DataType: "link",
 		Priority: 0.1,
 		From:     "latest",
 	}
