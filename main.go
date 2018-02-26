@@ -9,10 +9,15 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
+
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 func main() {
-	var plugin *Plugin = &Plugin{
+	var plugin = &Plugin{
 		ID:          "icp-dashboard",
 		Label:       "ICP Dashboard",
 		Description: "Links into the ICP Dashboard",
@@ -40,6 +45,8 @@ func main() {
 		listener.Close()
 		os.RemoveAll(filepath.Dir(socketPath))
 	}()
+
+	go startPollingK8sObject(plugin)
 
 	http.HandleFunc("/report", plugin.HandleReport)
 	if err := http.Serve(listener, nil); err != nil {
@@ -69,4 +76,86 @@ func setupSignals(socketPath string) {
 		os.RemoveAll(filepath.Dir(socketPath))
 		os.Exit(0)
 	}()
+}
+
+func startPollingK8sObject(p *Plugin) {
+	for {
+		time.Sleep(10 * time.Second)
+		generateReport(p)
+	}
+}
+
+func generateReport(p *Plugin) {
+	log.Printf("Probe starting on %s...\n", time.Now())
+	var hostNode = &Host{}
+	hostNode.Init()
+
+	rpt := WeaveReport{Plugins: []PluginSpec{{
+		ID:          p.ID,
+		Label:       p.Label,
+		Description: p.Description,
+		Interfaces:  p.Interfaces,
+		APIVersion:  p.APIVersion,
+	}}}
+
+	rpt.AddToReport(hostNode)
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		panic(err.Error())
+	}
+
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	done := make(chan bool)
+
+	go func() {
+		deployments, _ := clientset.Apps().Deployments("").List(meta_v1.ListOptions{})
+
+		for _, k8sobject := range deployments.Items {
+			// fmt.Printf("\n\nFound Controller %s\n", k8sobject.GetName())
+
+			rpt.AddToReport(&k8sobject)
+		}
+
+		done <- true
+	}()
+
+	go func() {
+		daemonsets, _ := clientset.Apps().DaemonSets("").List(meta_v1.ListOptions{})
+
+		for _, k8sobject := range daemonsets.Items {
+			// fmt.Printf("\n\nFound Controller %s\n", k8sobject.GetName())
+
+			rpt.AddToReport(&k8sobject)
+		}
+
+		done <- true
+	}()
+
+	go func() {
+		services, _ := clientset.CoreV1().Services("").List(meta_v1.ListOptions{})
+		for _, k8sobject := range services.Items {
+			// fmt.Printf("\n\nFound services %s\n", k8sobject.GetName())
+			annotations := k8sobject.GetAnnotations()
+			if url, ok := annotations["console"]; ok {
+				// url := fmt.Sprintf("console=%s", url)
+				fmt.Printf("\n\nFound annotations %s\n", url)
+			}
+			rpt.AddToReport(&k8sobject)
+		}
+
+		done <- true
+	}()
+
+	// Wait for go routines
+	<-done
+	<-done
+	<-done
+	log.Printf("Probe finished on %s...\n", time.Now())
+	p.Report = rpt
 }

@@ -16,7 +16,7 @@ spec:
       hostNetwork: true
       containers:
         - name: weavescope-icp-dashboard-plugin
-          image: mycluster.icp:8500/default/weavescope-icp-dashboard-plugin:latest
+          image: ycao/weavescope-icp-dashboard-plugin:latest
           imagePullPolicy: Always
           securityContext:
             privileged: true

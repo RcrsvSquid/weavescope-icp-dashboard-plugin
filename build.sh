@@ -2,7 +2,7 @@
 set -ex
 
 TAG=${1:-latest}
-export IMAGE_NAME="mycluster.icp:8500/default/weavescope-icp-dashboard-plugin:$TAG"
+export IMAGE_NAME="ycao/weavescope-icp-dashboard-plugin:$TAG"
 
 docker build -t $IMAGE_NAME .
 docker push $IMAGE_NAME

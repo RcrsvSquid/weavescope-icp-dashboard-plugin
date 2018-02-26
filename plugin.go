@@ -12,7 +12,6 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 type PluginSpec struct {
@@ -69,6 +68,8 @@ type WeaveReport struct {
 
 	DaemonSet Topology `json:"DaemonSet,omitempty"`
 
+	Service Topology `json:"Service,omitempty"`
+
 	Plugins []PluginSpec `json:"Plugins"`
 }
 
@@ -95,7 +96,8 @@ func prettyprint(b []byte) ([]byte, error) {
 }
 
 func (p *Plugin) HandleReport(w http.ResponseWriter, r *http.Request) {
-	rpt := p.GenerateReport()
+	// log.Printf("HandleReport ...\n")
+	rpt := p.Report
 
 	raw, err := json.Marshal(&rpt)
 	if err != nil {
@@ -113,7 +115,7 @@ func (p *Plugin) HandleReport(w http.ResponseWriter, r *http.Request) {
 // TODO: Make this work
 func (p *Plugin) GetTopLevelK8S(clientset *kubernetes.Clientset, controllers []K8SObject) {
 	for _, k8sobject := range controllers {
-		fmt.Printf("\n\nFound Controller %s\n", k8sobject.GetName())
+		// fmt.Printf("\n\nFound Controller %s\n", k8sobject.GetName())
 
 		p.Report.AddToReport(k8sobject)
 		labels := k8sobject.GetLabels()
@@ -140,64 +142,6 @@ func (p *Plugin) GetTopLevelK8S(clientset *kubernetes.Clientset, controllers []K
 	}
 }
 
-func (p *Plugin) GenerateReport() WeaveReport {
-	var hostNode *Host = &Host{}
-	hostNode.Init()
-
-	p.Report = WeaveReport{Plugins: []PluginSpec{{
-		ID:          p.ID,
-		Label:       p.Label,
-		Description: p.Description,
-		Interfaces:  p.Interfaces,
-		APIVersion:  p.APIVersion,
-	}}}
-
-	p.Report.AddToReport(hostNode)
-
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		panic(err.Error())
-	}
-
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	done := make(chan bool)
-
-	go func() {
-		deployments, _ := clientset.Apps().Deployments("").List(meta_v1.ListOptions{})
-
-		for _, k8sobject := range deployments.Items {
-			fmt.Printf("\n\nFound Controller %s\n", k8sobject.GetName())
-
-			p.Report.AddToReport(&k8sobject)
-		}
-
-		done <- true
-	}()
-
-	go func() {
-		daemonsets, _ := clientset.Apps().DaemonSets("").List(meta_v1.ListOptions{})
-
-		for _, k8sobject := range daemonsets.Items {
-			fmt.Printf("\n\nFound Controller %s\n", k8sobject.GetName())
-
-			p.Report.AddToReport(&k8sobject)
-		}
-
-		done <- true
-	}()
-
-	// Wait for go routines
-	<-done
-	<-done
-
-	return p.Report
-}
-
 func handleControllerErr(err error) {
 	if err != nil {
 		panic(err.Error())
@@ -215,6 +159,9 @@ func (w *WeaveReport) AddToReport(obj K8SObject) {
 	case *app_v1.DaemonSet:
 		w.DaemonSet.Add(obj)
 
+	case *core_v1.Service:
+		w.Service.Add(obj)
+
 	case *core_v1.Pod:
 		w.Pods.Add(obj)
 	}
@@ -222,7 +169,8 @@ func (w *WeaveReport) AddToReport(obj K8SObject) {
 
 func (top *Topology) Add(obj K8SObject) {
 	top.AddLatest(obj)
-	top.AddMetadataTemplate(obj)
+	// fmt.Printf("%T\n", obj)
+	// top.AddMetadataTemplate(obj)
 	top.AddTableTemplate(obj)
 }
 
