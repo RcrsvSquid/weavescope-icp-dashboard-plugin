@@ -11,13 +11,15 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 )
 
+var BaseUrl = os.Getenv("ICP_DASHBOARD")
+
 var formatStrings = map[string]string{
-	"host":       "/console/platform/nodes/%v",           // ip
-	"deployment": "/console/workloads/deployments/%s/%s", // namespace, deployment
-	"daemon_set": "/console/workloads/daemonsets/%s/%s",  // namespace, daemonset
-	"service":    "/console/access/services/%s/%s",       // namespace, daemonset
+	"host":       BaseUrl + "/platform/nodes/%v",           // ip
+	"deployment": BaseUrl + "/workloads/deployments/%s/%s", // namespace, deployment
+	"daemon_set": BaseUrl + "/workloads/daemonsets/%s/%s",  // namespace, daemonset
+	"service":    BaseUrl + "/access/services/%s/%s",       // namespace, daemonset
 	// "pod":        "/console/workloads/deployments/%s/%s/pods/%s", // namespace, deployment, pod
-	"pod": "/console/workloads/deployments/%s/%s/pods", // namespace, deployment, pod
+	"pod": BaseUrl + "/workloads/deployments/%s/%s/pods", // namespace, deployment, pod
 }
 
 type K8SObject interface {
