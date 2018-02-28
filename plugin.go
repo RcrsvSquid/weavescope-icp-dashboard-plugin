@@ -3,15 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	app_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 type PluginSpec struct {
@@ -110,42 +107,6 @@ func (p *Plugin) HandleReport(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Write(raw)
-}
-
-// TODO: Make this work
-func (p *Plugin) GetTopLevelK8S(clientset *kubernetes.Clientset, controllers []K8SObject) {
-	for _, k8sobject := range controllers {
-		// fmt.Printf("\n\nFound Controller %s\n", k8sobject.GetName())
-
-		p.Report.AddToReport(k8sobject)
-		labels := k8sobject.GetLabels()
-
-		if appName, ok := labels["app"]; ok {
-			selector := fmt.Sprintf("app=%s", appName)
-
-			pods, err := clientset.
-				CoreV1().
-				Pods("").
-				List(meta_v1.ListOptions{LabelSelector: selector})
-
-			if err != nil {
-				panic(err.Error())
-			}
-
-			fmt.Printf("There are %d pods in %s\n", len(pods.Items), appName)
-
-			for _, pod := range pods.Items {
-				fmt.Printf("Found pod %s\n", pod.GetName())
-				p.Report.AddToReport(&pod)
-			}
-		}
-	}
-}
-
-func handleControllerErr(err error) {
-	if err != nil {
-		panic(err.Error())
-	}
 }
 
 func (w *WeaveReport) AddToReport(obj K8SObject) {
