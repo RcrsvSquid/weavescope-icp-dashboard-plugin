@@ -70,6 +70,8 @@ type WeaveReport struct {
 
 	Service Topology `json:"Service,omitempty"`
 
+	StatefulSet Topology `json:"StatefulSet,omitempty"`
+
 	Plugins []PluginSpec `json:"Plugins"`
 }
 
@@ -161,6 +163,9 @@ func (w *WeaveReport) AddToReport(obj K8SObject) {
 
 	case *core_v1.Service:
 		w.Service.Add(obj)
+
+	case *app_v1.StatefulSet:
+		w.StatefulSet.Add(obj)
 
 	case *core_v1.Pod:
 		w.Pods.Add(obj)

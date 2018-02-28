@@ -11,15 +11,16 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 )
 
-var BaseUrl = os.Getenv("ICP_DASHBOARD")
+var baseUrl = os.Getenv("ICP_DASHBOARD")
 
 var formatStrings = map[string]string{
-	"host":       BaseUrl + "/platform/nodes/%v",           // ip
-	"deployment": BaseUrl + "/workloads/deployments/%s/%s", // namespace, deployment
-	"daemon_set": BaseUrl + "/workloads/daemonsets/%s/%s",  // namespace, daemonset
-	"service":    BaseUrl + "/access/services/%s/%s",       // namespace, daemonset
+	"host":        baseUrl + "/platform/nodes/%v",            // ip
+	"deployment":  baseUrl + "/workloads/deployments/%s/%s",  // namespace, deployment
+	"daemon_set":  baseUrl + "/workloads/daemonsets/%s/%s",   // namespace, daemonset
+	"service":     baseUrl + "/access/services/%s/%s",        // namespace, daemonset
+	"statefulset": baseUrl + "/workloads/statefulsets/%s/%s", // namespace, daemonset
 	// "pod":        "/console/workloads/deployments/%s/%s/pods/%s", // namespace, deployment, pod
-	"pod": BaseUrl + "/workloads/deployments/%s/%s/pods", // namespace, deployment, pod
+	"pod": baseUrl + "/workloads/deployments/%s/%s/pods", // namespace, deployment, pod
 }
 
 type K8SObject interface {
@@ -59,7 +60,6 @@ func (h *Host) Init() {
 	h.IP = GetOutboundIP()
 }
 
-// TODO: Take BaseUrl as the first param
 func GetPlatformUrl(obj K8SObject) (string, error) {
 	switch obj.(type) {
 	case *Host:
@@ -74,6 +74,9 @@ func GetPlatformUrl(obj K8SObject) (string, error) {
 	case *core_v1.Service:
 		return fmt.Sprintf(formatStrings["service"], obj.GetNamespace(), obj.GetName()), nil
 
+	case *app_v1.StatefulSet:
+		return fmt.Sprintf(formatStrings["statefulset"], obj.GetNamespace(), obj.GetName()), nil
+
 	// TODO: Fix this link
 	case *core_v1.Pod:
 		return fmt.Sprintf(formatStrings["pod"], obj.GetNamespace(), obj.GetName()), nil
@@ -87,21 +90,23 @@ func GetTableID(obj K8SObject) string { return fmt.Sprintf("%s", obj.GetName()) 
 
 func GetWeaveID(obj K8SObject) (string, error) {
 	switch obj.(type) {
-	case *Host:
-		return fmt.Sprintf("%s;<host>", obj.GetName()), nil
-	// case Pod:
-	// 	return fmt.Sprintf("%s;<pod>", obj.GetName())
+	case *app_v1.DaemonSet:
+		return fmt.Sprintf("%s;<daemonset>", obj.GetUID()), nil
+
 	case *app_v1.Deployment:
 		return fmt.Sprintf("%s;<deployment>", obj.GetUID()), nil
 
-	case *app_v1.DaemonSet:
-		return fmt.Sprintf("%s;<daemonset>", obj.GetUID()), nil
+	case *Host:
+		return fmt.Sprintf("%s;<host>", obj.GetName()), nil
+
+	case *core_v1.Pod:
+		return fmt.Sprintf("%s;<pod>", obj.GetUID()), nil
 
 	case *core_v1.Service:
 		return fmt.Sprintf("%s;<service>", obj.GetUID()), nil
 
-	case *core_v1.Pod:
-		return fmt.Sprintf("%s;<pod>", obj.GetUID()), nil
+	case *app_v1.StatefulSet:
+		return fmt.Sprintf("%s;<statefulset>", obj.GetUID()), nil
 
 	default:
 		return "", fmt.Errorf("No Compatible Type Found")

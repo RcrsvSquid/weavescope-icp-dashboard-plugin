@@ -85,10 +85,63 @@ func startPollingK8sObject(p *Plugin) {
 	}
 }
 
+type k8sRetriever func(clientset *kubernetes.Clientset, rpt *WeaveReport, done chan<- bool)
+
+func getDaemonSets(clientset *kubernetes.Clientset, rpt *WeaveReport, done chan<- bool) {
+	daemonsets, _ := clientset.Apps().DaemonSets("").List(meta_v1.ListOptions{})
+
+	for _, k8sobject := range daemonsets.Items {
+		rpt.AddToReport(&k8sobject)
+	}
+
+	done <- true
+}
+
+func getDeployments(clientset *kubernetes.Clientset, rpt *WeaveReport, done chan<- bool) {
+	deployments, _ := clientset.Apps().Deployments("").List(meta_v1.ListOptions{})
+
+	for _, k8sobject := range deployments.Items {
+		rpt.AddToReport(&k8sobject)
+	}
+
+	done <- true
+}
+
+func getServices(clientset *kubernetes.Clientset, rpt *WeaveReport, done chan<- bool) {
+	services, _ := clientset.CoreV1().Services("").List(meta_v1.ListOptions{})
+	for _, k8sobject := range services.Items {
+		// fmt.Printf("\n\nFound services %s\n", k8sobject.GetName())
+		annotations := k8sobject.GetAnnotations()
+		if url, ok := annotations["console"]; ok {
+			// url := fmt.Sprintf("console=%s", url)
+			fmt.Printf("\n\nFound annotations %s\n", url)
+		}
+		rpt.AddToReport(&k8sobject)
+	}
+
+	done <- true
+}
+
+func getStatefulSets(clientset *kubernetes.Clientset, rpt *WeaveReport, done chan<- bool) {
+	statefulsets, _ := clientset.Apps().StatefulSets("").List(meta_v1.ListOptions{})
+	for _, k8sobject := range statefulsets.Items {
+		rpt.AddToReport(&k8sobject)
+	}
+
+	done <- true
+}
+
 func generateReport(p *Plugin) {
 	log.Printf("Probe starting on %s...\n", time.Now())
 	var hostNode = &Host{}
 	hostNode.Init()
+
+	k8sRetrievers := [...]k8sRetriever{
+		getDaemonSets,
+		getDeployments,
+		getStatefulSets,
+		getServices,
+	}
 
 	rpt := WeaveReport{Plugins: []PluginSpec{{
 		ID:          p.ID,
@@ -105,7 +158,6 @@ func generateReport(p *Plugin) {
 		panic(err.Error())
 	}
 
-	// creates the clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err.Error())
@@ -113,49 +165,15 @@ func generateReport(p *Plugin) {
 
 	done := make(chan bool)
 
-	go func() {
-		deployments, _ := clientset.Apps().Deployments("").List(meta_v1.ListOptions{})
+	for _, retriever := range k8sRetrievers {
+		go retriever(clientset, &rpt, done)
+	}
 
-		for _, k8sobject := range deployments.Items {
-			// fmt.Printf("\n\nFound Controller %s\n", k8sobject.GetName())
+	// Wait for all the queries to exit
+	for range k8sRetrievers {
+		<-done
+	}
 
-			rpt.AddToReport(&k8sobject)
-		}
-
-		done <- true
-	}()
-
-	go func() {
-		daemonsets, _ := clientset.Apps().DaemonSets("").List(meta_v1.ListOptions{})
-
-		for _, k8sobject := range daemonsets.Items {
-			// fmt.Printf("\n\nFound Controller %s\n", k8sobject.GetName())
-
-			rpt.AddToReport(&k8sobject)
-		}
-
-		done <- true
-	}()
-
-	go func() {
-		services, _ := clientset.CoreV1().Services("").List(meta_v1.ListOptions{})
-		for _, k8sobject := range services.Items {
-			// fmt.Printf("\n\nFound services %s\n", k8sobject.GetName())
-			annotations := k8sobject.GetAnnotations()
-			if url, ok := annotations["console"]; ok {
-				// url := fmt.Sprintf("console=%s", url)
-				fmt.Printf("\n\nFound annotations %s\n", url)
-			}
-			rpt.AddToReport(&k8sobject)
-		}
-
-		done <- true
-	}()
-
-	// Wait for go routines
-	<-done
-	<-done
-	<-done
 	log.Printf("Probe finished on %s...\n", time.Now())
 	p.Report = rpt
 }
