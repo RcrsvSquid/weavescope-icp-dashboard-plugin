@@ -1,11 +1,12 @@
 apiVersion: extensions/v1beta1
-kind: DaemonSet
+kind: Deployment
 metadata:
   labels:
     app: weavescope
     weavescope-component: weavescope-icp-dashboard-plugin
   name: weavescope-icp-dashboard-plugin
 spec:
+  replicas: 1
   template:
     metadata:
       labels:
