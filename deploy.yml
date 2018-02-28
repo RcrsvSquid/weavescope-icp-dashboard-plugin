@@ -16,13 +16,20 @@ spec:
       hostNetwork: true
       containers:
         - name: weavescope-icp-dashboard-plugin
-          image: ycao/weavescope-icp-dashboard-plugin:latest
+          image: sidneywibm/weavescope-icp-dashboard-plugin:latest
           imagePullPolicy: Always
           securityContext:
             privileged: true
           volumeMounts:
           - name: scope-plugins
             mountPath: /var/run/scope/plugins
+          env:
+            - name: ICP_DASHBOARD
+              valueFrom:
+                configMapKeyRef:
+                  name: icp-dashboard
+                  key: dashboard-link
+
       volumes:
       - name: scope-plugins
         hostPath:
