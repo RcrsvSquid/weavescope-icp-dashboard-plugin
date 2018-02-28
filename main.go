@@ -112,11 +112,11 @@ func getServices(clientset *kubernetes.Clientset, rpt *WeaveReport, done chan<- 
 	for _, k8sobject := range services.Items {
 		// fmt.Printf("\n\nFound services %s\n", k8sobject.GetName())
 		annotations := k8sobject.GetAnnotations()
-		if url, ok := annotations["console"]; ok {
-			// url := fmt.Sprintf("console=%s", url)
+		if url, ok := annotations["adminConsoleUrl"]; ok {
+			url := fmt.Sprintf("adminConsoleUrl=%s", url)
 			fmt.Printf("\n\nFound annotations %s\n", url)
+			rpt.AddToReport(&k8sobject)
 		}
-		rpt.AddToReport(&k8sobject)
 	}
 
 	done <- true
@@ -133,8 +133,8 @@ func getStatefulSets(clientset *kubernetes.Clientset, rpt *WeaveReport, done cha
 
 func generateReport(p *Plugin) {
 	startTime := time.Now()
-	var hostNode = &Host{}
-	hostNode.Init()
+	// var hostNode = &Host{}
+	// hostNode.Init()
 
 	k8sRetrievers := [...]k8sRetriever{
 		getDaemonSets,
@@ -151,7 +151,7 @@ func generateReport(p *Plugin) {
 		APIVersion:  p.APIVersion,
 	}}}
 
-	rpt.AddToReport(hostNode)
+	// rpt.AddToReport(hostNode)
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
