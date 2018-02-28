@@ -60,8 +60,6 @@ type Topology struct {
 }
 
 type WeaveReport struct {
-	Host Topology `json:"Host,omitempty"`
-
 	Pods Topology `json:"Pods,omitempty"`
 
 	Deployment Topology `json:"Deployment,omitempty"`
@@ -152,8 +150,6 @@ func handleControllerErr(err error) {
 
 func (w *WeaveReport) AddToReport(obj K8SObject) {
 	switch obj.(type) {
-	case *Host:
-		w.Host.Add(obj)
 
 	case *app_v1.Deployment:
 		w.Deployment.Add(obj)

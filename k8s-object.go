@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
-	"strings"
 
 	app_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
@@ -16,7 +14,7 @@ var baseUrl = os.Getenv("ICP_DASHBOARD")
 var formatStrings = map[string]string{
 	"host":        baseUrl + "/platform/nodes/%v",            // ip
 	"deployment":  baseUrl + "/workloads/deployments/%s/%s",  // namespace, deployment
-	"daemon_set":  baseUrl + "/workloads/daemonsets/%s/%s",   // namespace, daemonset
+	"daemonset":   baseUrl + "/workloads/daemonsets/%s/%s",   // namespace, daemonset
 	"service":     baseUrl + "/access/services/%s/%s",        // namespace, daemonset
 	"statefulset": baseUrl + "/workloads/statefulsets/%s/%s", // namespace, daemonset
 	// "pod":        "/console/workloads/deployments/%s/%s/pods/%s", // namespace, deployment, pod
@@ -31,45 +29,13 @@ type K8SObject interface {
 	GetAnnotations() map[string]string
 }
 
-type Host struct {
-	UID  types.UID
-	Name string
-	IP   string
-}
-
-func (h *Host) GetName() string                   { return h.Name }
-func (h *Host) GetUID() types.UID                 { return h.UID }
-func (h *Host) GetNamespace() string              { return h.IP }
-func (h *Host) GetLabels() map[string]string      { return map[string]string{} }
-func (h *Host) GetAnnotations() map[string]string { return map[string]string{} }
-
-func GetOutboundIP() string {
-	conn, _ := net.Dial("udp", "8.8.8.8:80")
-	defer conn.Close()
-	localAddr := conn.LocalAddr().String()
-	idx := strings.LastIndex(localAddr, ":")
-	return localAddr[0:idx]
-}
-
-func (h *Host) Init() {
-	hostID, _ := os.Hostname()
-
-	// fmt.Println("Found host", hostID)
-
-	h.Name = hostID
-	h.IP = GetOutboundIP()
-}
-
 func GetPlatformUrl(obj K8SObject) (string, error) {
 	switch obj.(type) {
-	case *Host:
-		return fmt.Sprintf(formatStrings["host"], obj.GetNamespace()), nil
-
 	case *app_v1.Deployment:
 		return fmt.Sprintf(formatStrings["deployment"], obj.GetNamespace(), obj.GetName()), nil
 
 	case *app_v1.DaemonSet:
-		return fmt.Sprintf(formatStrings["daemon_set"], obj.GetNamespace(), obj.GetName()), nil
+		return fmt.Sprintf(formatStrings["daemonset"], obj.GetNamespace(), obj.GetName()), nil
 
 	case *core_v1.Service:
 		return fmt.Sprintf(formatStrings["service"], obj.GetNamespace(), obj.GetName()), nil
@@ -95,9 +61,6 @@ func GetWeaveID(obj K8SObject) (string, error) {
 
 	case *app_v1.Deployment:
 		return fmt.Sprintf("%s;<deployment>", obj.GetUID()), nil
-
-	case *Host:
-		return fmt.Sprintf("%s;<host>", obj.GetName()), nil
 
 	case *core_v1.Pod:
 		return fmt.Sprintf("%s;<pod>", obj.GetUID()), nil
@@ -146,15 +109,7 @@ func GetWeaveMetaData(obj K8SObject) (id string, metadata Metadata) {
 }
 
 func GetLatest(obj K8SObject) (id string, latest LatestSample) {
-	var url string
-	switch obj.(type) {
-	case *core_v1.Service:
-		annotations := obj.GetAnnotations()
-		url = annotations["adminConsoleUrl"]
-
-	default:
-		url, _ = GetPlatformUrl(obj)
-	}
+	url, _ := GetPlatformUrl(obj)
 
 	// Meta data table ID
 	id = fmt.Sprintf("icp-link-%s___link", GetTableID(obj))

@@ -132,7 +132,7 @@ func getStatefulSets(clientset *kubernetes.Clientset, rpt *WeaveReport, done cha
 }
 
 func generateReport(p *Plugin) {
-	log.Printf("Probe starting on %s...\n", time.Now())
+	startTime := time.Now()
 	var hostNode = &Host{}
 	hostNode.Init()
 
@@ -174,6 +174,6 @@ func generateReport(p *Plugin) {
 		<-done
 	}
 
-	log.Printf("Probe finished on %s...\n", time.Now())
+	log.Printf("Probe finished in %v...\n", time.Since(startTime))
 	p.Report = rpt
 }
