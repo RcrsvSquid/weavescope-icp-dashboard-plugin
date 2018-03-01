@@ -2,14 +2,13 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	app_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
 	types "k8s.io/apimachinery/pkg/types"
 )
 
-var baseUrl = os.Getenv("ICP_DASHBOARD")
+var baseUrl = GetEnv("ICP_DASHBOARD", "/console")
 
 var formatStrings = map[string]string{
 	"host":        baseUrl + "/platform/nodes/%v",            // ip

@@ -1,19 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	app_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 type PluginSpec struct {
@@ -87,22 +82,6 @@ type Plugin struct {
 	Report   WeaveReport
 }
 
-func (p *Plugin) HandleReport(w http.ResponseWriter, r *http.Request) {
-	raw, err := json.Marshal(&p.Report)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Fatalf("JSON Marshall Error %v", err)
-	}
-
-	debug(func() {
-		jsonIndented, _ := prettyprint(raw)
-		fmt.Printf("Report\n%s\n", jsonIndented)
-	})
-
-	w.WriteHeader(http.StatusOK)
-	w.Write(raw)
-}
-
 func (p *Plugin) GenerateReport() {
 	startTime := time.Now()
 
@@ -115,16 +94,16 @@ func (p *Plugin) GenerateReport() {
 	}}}
 
 	//  TODO: Create the client once as a constant <28-02-18, sidney> //
-	client := getK8sClient()
+	client := GetK8sClient()
 
 	done := make(chan bool)
 
-	for _, retriever := range k8sRetrievers {
-		go retriever(client, &p.Report, done)
+	for _, query := range K8sQueries {
+		go query(client, &p.Report, done)
 	}
 
 	// Wait for all the queries to exit
-	for range k8sRetrievers {
+	for range K8sQueries {
 		<-done
 	}
 
@@ -138,71 +117,20 @@ func (p *Plugin) pollK8s() {
 	}
 }
 
-func getK8sClient() *kubernetes.Clientset {
-	config, err := rest.InClusterConfig()
+func (p *Plugin) HandleReport(w http.ResponseWriter, r *http.Request) {
+	raw, err := json.Marshal(&p.Report)
 	if err != nil {
-		panic(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Fatalf("JSON Marshall Error %v", err)
 	}
 
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err.Error())
-	}
+	Debug(func() {
+		jsonIndented, _ := PrettyFmt(raw)
+		fmt.Printf("Report\n%s\n", jsonIndented)
+	})
 
-	return client
-}
-
-type k8sRetriever func(*kubernetes.Clientset, *WeaveReport, chan<- bool)
-
-func getDaemonSets(client *kubernetes.Clientset, rpt *WeaveReport, done chan<- bool) {
-	daemonsets, _ := client.Apps().DaemonSets("").List(meta_v1.ListOptions{})
-
-	for _, k8sobject := range daemonsets.Items {
-		rpt.AddToReport(&k8sobject)
-	}
-
-	done <- true
-}
-
-func getDeployments(client *kubernetes.Clientset, rpt *WeaveReport, done chan<- bool) {
-	deployments, _ := client.Apps().Deployments("").List(meta_v1.ListOptions{})
-
-	for _, k8sobject := range deployments.Items {
-		rpt.AddToReport(&k8sobject)
-	}
-
-	done <- true
-}
-
-func getServices(client *kubernetes.Clientset, rpt *WeaveReport, done chan<- bool) {
-	services, _ := client.CoreV1().Services("").List(meta_v1.ListOptions{})
-	for _, k8sobject := range services.Items {
-		// fmt.Printf("\n\nFound services %s\n", k8sobject.GetName())
-		annotations := k8sobject.GetAnnotations()
-		if url, ok := annotations["console"]; ok {
-			// url := fmt.Sprintf("console=%s", url)
-			fmt.Printf("\n\nFound annotations %s\n", url)
-		}
-		rpt.AddToReport(&k8sobject)
-	}
-
-	done <- true
-}
-
-func getStatefulSets(client *kubernetes.Clientset, rpt *WeaveReport, done chan<- bool) {
-	statefulsets, _ := client.Apps().StatefulSets("").List(meta_v1.ListOptions{})
-	for _, k8sobject := range statefulsets.Items {
-		rpt.AddToReport(&k8sobject)
-	}
-
-	done <- true
-}
-
-var k8sRetrievers = [...]k8sRetriever{
-	getDaemonSets,
-	getDeployments,
-	getStatefulSets,
-	getServices,
+	w.WriteHeader(http.StatusOK)
+	w.Write(raw)
 }
 
 func (w *WeaveReport) AddToReport(obj K8SObject) {
@@ -261,19 +189,4 @@ func (top *Topology) AddTableTemplate(obj K8SObject) {
 	}
 
 	top.TableTemplates[id] = tableTemplate
-}
-
-// Helper Functions
-
-func prettyprint(b []byte) ([]byte, error) {
-	var out bytes.Buffer
-	err := json.Indent(&out, b, "", "  ")
-	return out.Bytes(), err
-}
-
-func debug(do func()) {
-	isDebug, ok := os.LookupEnv("DEBUG")
-	if ok && isDebug == "true" {
-		do()
-	}
 }
