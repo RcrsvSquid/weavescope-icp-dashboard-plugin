@@ -21,11 +21,11 @@ var formatStrings = map[string]string{
 }
 
 type K8sObject interface {
-	GetUID() types.UID
+	GetAnnotations() map[string]string
+	GetLabels() map[string]string
 	GetName() string
 	GetNamespace() string
-	GetLabels() map[string]string
-	GetAnnotations() map[string]string
+	GetUID() types.UID
 }
 
 func GetPlatformUrl(obj K8sObject) (string, error) {
@@ -50,8 +50,6 @@ func GetPlatformUrl(obj K8sObject) (string, error) {
 		return "", fmt.Errorf("No Compatible Type Found")
 	}
 }
-
-func GetTableID(obj K8sObject) string { return fmt.Sprintf("%s", obj.GetName()) }
 
 func GetWeaveID(obj K8sObject) (string, error) {
 	switch obj.(type) {
@@ -94,7 +92,7 @@ func GetWeaveTable(obj K8sObject) (id string, table Table) {
 }
 
 func GetWeaveMetaData(obj K8sObject) (id string, metadata Metadata) {
-	id = fmt.Sprintf("%s-meta", GetTableID(obj))
+	id = fmt.Sprintf("%s-meta", obj.GetName())
 
 	metadata = Metadata{
 		ID:       id,
@@ -111,7 +109,7 @@ func GetLatest(obj K8sObject) (id string, latest LatestSample) {
 	url, _ := GetPlatformUrl(obj)
 
 	// Meta data table ID
-	id = fmt.Sprintf("icp-link-%s___link", GetTableID(obj))
+	id = fmt.Sprintf("icp-link-%s___link", obj.GetName())
 	latest = LatestSample{Value: url}
 
 	return
