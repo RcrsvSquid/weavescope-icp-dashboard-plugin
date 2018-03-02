@@ -18,8 +18,6 @@ func main() {
 		Description: "Links into the ICP Dashboard",
 		Interfaces:  []string{"reporter"},
 		APIVersion:  1,
-
-		Controls: Controls{false, false},
 	}
 
 	// We put the socket in a sub-directory to have more control on the permissions
@@ -51,18 +49,21 @@ func setupSocket(socketPath string) (net.Listener, error) {
 	if err := os.MkdirAll(filepath.Dir(socketPath), 0700); err != nil {
 		return nil, fmt.Errorf("failed to create directory %q: %v", filepath.Dir(socketPath), err)
 	}
+
 	listener, err := net.Listen("unix", socketPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on %q: %v", socketPath, err)
 	}
 
 	log.Printf("Listening on: unix://%s", socketPath)
+
 	return listener, nil
 }
 
 func setupSignals(socketPath string) {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
+
 	go func() {
 		<-interrupt
 		os.RemoveAll(filepath.Dir(socketPath))

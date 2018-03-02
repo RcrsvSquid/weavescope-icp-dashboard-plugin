@@ -6,13 +6,13 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type K8sQuery func(*kubernetes.Clientset, *WeaveReport, chan<- bool)
+type K8sQuery func(*kubernetes.Clientset, func(K8sObject))
 
 var K8sQueries = [...]K8sQuery{
-	GetDaemonSets,
-	GetDeployments,
-	GetStatefulSets,
-	GetServices,
+	MapDaemonSets,
+	MapDeployments,
+	MapStatefulSets,
+	MapServices,
 }
 
 func GetK8sClient() *kubernetes.Clientset {
@@ -29,42 +29,34 @@ func GetK8sClient() *kubernetes.Clientset {
 	return client
 }
 
-func GetDaemonSets(client *kubernetes.Clientset, rpt *WeaveReport, done chan<- bool) {
+func MapDaemonSets(client *kubernetes.Clientset, do func(K8sObject)) {
 	daemonsets, _ := client.Apps().DaemonSets("").List(meta_v1.ListOptions{})
 
 	for _, k8sobject := range daemonsets.Items {
-		rpt.AddToReport(&k8sobject)
+		do(&k8sobject)
 	}
-
-	done <- true
 }
 
-func GetDeployments(client *kubernetes.Clientset, rpt *WeaveReport, done chan<- bool) {
+func MapDeployments(client *kubernetes.Clientset, do func(K8sObject)) {
 	deployments, _ := client.Apps().Deployments("").List(meta_v1.ListOptions{})
 
 	for _, k8sobject := range deployments.Items {
-		rpt.AddToReport(&k8sobject)
+		do(&k8sobject)
 	}
-
-	done <- true
 }
 
-func GetServices(client *kubernetes.Clientset, rpt *WeaveReport, done chan<- bool) {
+func MapServices(client *kubernetes.Clientset, do func(K8sObject)) {
 	services, _ := client.CoreV1().Services("").List(meta_v1.ListOptions{})
 
 	for _, k8sobject := range services.Items {
-		rpt.AddToReport(&k8sobject)
+		do(&k8sobject)
 	}
-
-	done <- true
 }
 
-func GetStatefulSets(client *kubernetes.Clientset, rpt *WeaveReport, done chan<- bool) {
+func MapStatefulSets(client *kubernetes.Clientset, do func(K8sObject)) {
 	statefulsets, _ := client.Apps().StatefulSets("").List(meta_v1.ListOptions{})
 
 	for _, k8sobject := range statefulsets.Items {
-		rpt.AddToReport(&k8sobject)
+		do(&k8sobject)
 	}
-
-	done <- true
 }

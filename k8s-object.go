@@ -20,7 +20,7 @@ var formatStrings = map[string]string{
 	"pod": baseUrl + "/workloads/deployments/%s/%s/pods", // namespace, deployment, pod
 }
 
-type K8SObject interface {
+type K8sObject interface {
 	GetUID() types.UID
 	GetName() string
 	GetNamespace() string
@@ -28,7 +28,7 @@ type K8SObject interface {
 	GetAnnotations() map[string]string
 }
 
-func GetPlatformUrl(obj K8SObject) (string, error) {
+func GetPlatformUrl(obj K8sObject) (string, error) {
 	switch obj.(type) {
 	case *app_v1.Deployment:
 		return fmt.Sprintf(formatStrings["deployment"], obj.GetNamespace(), obj.GetName()), nil
@@ -51,9 +51,9 @@ func GetPlatformUrl(obj K8SObject) (string, error) {
 	}
 }
 
-func GetTableID(obj K8SObject) string { return fmt.Sprintf("%s", obj.GetName()) }
+func GetTableID(obj K8sObject) string { return fmt.Sprintf("%s", obj.GetName()) }
 
-func GetWeaveID(obj K8SObject) (string, error) {
+func GetWeaveID(obj K8sObject) (string, error) {
 	switch obj.(type) {
 	case *app_v1.DaemonSet:
 		return fmt.Sprintf("%s;<daemonset>", obj.GetUID()), nil
@@ -75,7 +75,7 @@ func GetWeaveID(obj K8SObject) (string, error) {
 	}
 }
 
-func GetWeaveTable(obj K8SObject) (id string, table Table) {
+func GetWeaveTable(obj K8sObject) (id string, table Table) {
 	id = "icp-link"
 
 	table = Table{
@@ -93,7 +93,7 @@ func GetWeaveTable(obj K8SObject) (id string, table Table) {
 	return
 }
 
-func GetWeaveMetaData(obj K8SObject) (id string, metadata Metadata) {
+func GetWeaveMetaData(obj K8sObject) (id string, metadata Metadata) {
 	id = fmt.Sprintf("%s-meta", GetTableID(obj))
 
 	metadata = Metadata{
@@ -107,7 +107,7 @@ func GetWeaveMetaData(obj K8SObject) (id string, metadata Metadata) {
 	return
 }
 
-func GetLatest(obj K8SObject) (id string, latest LatestSample) {
+func GetLatest(obj K8sObject) (id string, latest LatestSample) {
 	url, _ := GetPlatformUrl(obj)
 
 	// Meta data table ID

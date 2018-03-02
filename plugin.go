@@ -11,66 +11,6 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 )
 
-type PluginSpec struct {
-	ID          string   `json:"id"`
-	Label       string   `json:"label"`
-	Description string   `json:"description,omitempty"`
-	Interfaces  []string `json:"interfaces"`
-	APIVersion  int      `json:"api_version,omitempty"`
-}
-
-type LatestSample struct {
-	Value     string    `json:"value"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-type Node struct {
-	Latest map[string]LatestSample `json:"latest"`
-}
-
-type Metadata struct {
-	ID       string  `json:"id"`
-	Label    string  `json:"label"`
-	DataType string  `json:"dataType"`
-	Priority float64 `json:"priority"`
-	From     string  `json:"from"`
-}
-
-type TableColumn struct {
-	ID       string `json:"id"`
-	Label    string `json:"label"`
-	DataType string `json:"dataType"`
-}
-
-type Table struct {
-	ID      string        `json:"id"`
-	Label   string        `json:"label"`
-	Prefix  string        `json:"prefix"`
-	Type    string        `json:"type"`
-	Columns []TableColumn `json:"columns,omitempty"`
-}
-
-type Topology struct {
-	Nodes             map[string]Node     `json:"nodes"`
-	MetadataTemplates map[string]Metadata `json:"metadata_templates,omitempty"`
-	TableTemplates    map[string]Table    `json:"table_templates,omitempty"`
-}
-
-type WeaveReport struct {
-	Plugins []PluginSpec `json:"Plugins"`
-
-	DaemonSet   Topology `json:"DaemonSet,omitempty"`
-	Deployment  Topology `json:"Deployment,omitempty"`
-	Pods        Topology `json:"Pods,omitempty"`
-	Service     Topology `json:"Service,omitempty"`
-	StatefulSet Topology `json:"StatefulSet,omitempty"`
-}
-
-type Controls struct {
-	Chaos    bool
-	LoadTest bool
-}
-
 type Plugin struct {
 	ID          string   `json:"id"`
 	Label       string   `json:"label"`
@@ -78,8 +18,44 @@ type Plugin struct {
 	Interfaces  []string `json:"interfaces"`
 	APIVersion  int      `json:"api_version,omitempty"`
 
-	Controls Controls
-	Report   WeaveReport
+	Report WeaveReport
+}
+
+// Return the correct topology for a given kubernetes object
+func SelectTopoloy(w *WeaveReport, obj K8sObject) *Topology {
+	var top *Topology
+
+	switch obj.(type) {
+	case *app_v1.Deployment:
+		top = &w.Deployment
+
+	case *app_v1.DaemonSet:
+		top = &w.DaemonSet
+
+	case *core_v1.Service:
+		top = &w.Service
+
+	case *app_v1.StatefulSet:
+		top = &w.StatefulSet
+
+	case *core_v1.Pod:
+		top = &w.Pods
+	}
+
+	return top
+}
+
+// Compute and add the ICP link into a WeaveReport
+func AddICPLink(w *WeaveReport, obj K8sObject) {
+	latestKey, latest := GetLatest(obj)
+	weaveID, _ := GetWeaveID(obj)
+
+	tableID, tableTemplate := GetWeaveTable(obj)
+
+	top := SelectTopoloy(w, obj)
+
+	top.AddLatest(weaveID, latestKey, latest)
+	top.AddTableTemplate(tableID, tableTemplate)
 }
 
 func (p *Plugin) GenerateReport() {
@@ -93,13 +69,21 @@ func (p *Plugin) GenerateReport() {
 		APIVersion:  p.APIVersion,
 	}}}
 
-	//  TODO: Create the client once as a constant <28-02-18, sidney> //
 	client := GetK8sClient()
+
+	do := func(k8sobject K8sObject) {
+		AddICPLink(&p.Report, k8sobject)
+	}
 
 	done := make(chan bool)
 
-	for _, query := range K8sQueries {
-		go query(client, &p.Report, done)
+	// Execute queries concurrently
+	for _, k8sQuery := range K8sQueries {
+		go func(query K8sQuery) {
+			query(client, do)
+
+			done <- true
+		}(k8sQuery)
 	}
 
 	// Wait for all the queries to exit
@@ -107,14 +91,7 @@ func (p *Plugin) GenerateReport() {
 		<-done
 	}
 
-	log.Printf("Probe finished in %v...\n", time.Since(startTime))
-}
-
-func (p *Plugin) pollK8s() {
-	for {
-		time.Sleep(10 * time.Second)
-		p.GenerateReport()
-	}
+	log.Printf("Probe finished in %v\n", time.Since(startTime))
 }
 
 func (p *Plugin) HandleReport(w http.ResponseWriter, r *http.Request) {
@@ -133,60 +110,9 @@ func (p *Plugin) HandleReport(w http.ResponseWriter, r *http.Request) {
 	w.Write(raw)
 }
 
-func (w *WeaveReport) AddToReport(obj K8SObject) {
-	switch obj.(type) {
-
-	case *app_v1.Deployment:
-		w.Deployment.Add(obj)
-
-	case *app_v1.DaemonSet:
-		w.DaemonSet.Add(obj)
-
-	case *core_v1.Service:
-		w.Service.Add(obj)
-
-	case *app_v1.StatefulSet:
-		w.StatefulSet.Add(obj)
-
-	case *core_v1.Pod:
-		w.Pods.Add(obj)
+func (p *Plugin) pollK8s() {
+	for {
+		p.GenerateReport()
+		time.Sleep(10 * time.Second)
 	}
-}
-
-func (top *Topology) Add(obj K8SObject) {
-	top.AddLatest(obj)
-	top.AddTableTemplate(obj)
-}
-
-func (top *Topology) AddLatest(obj K8SObject) {
-	latestKey, latest := GetLatest(obj)
-	weaveID, _ := GetWeaveID(obj)
-
-	if len(top.Nodes) == 0 {
-		top.Nodes = make(map[string]Node)
-	}
-
-	top.Nodes[weaveID] = Node{
-		Latest: map[string]LatestSample{latestKey: latest},
-	}
-}
-
-func (top *Topology) AddMetadataTemplate(obj K8SObject) {
-	id, metaTableTemplate := GetWeaveMetaData(obj)
-
-	if len(top.MetadataTemplates) == 0 {
-		top.MetadataTemplates = make(map[string]Metadata)
-	}
-
-	top.MetadataTemplates[id] = metaTableTemplate
-}
-
-func (top *Topology) AddTableTemplate(obj K8SObject) {
-	id, tableTemplate := GetWeaveTable(obj)
-
-	if len(top.TableTemplates) == 0 {
-		top.TableTemplates = make(map[string]Table)
-	}
-
-	top.TableTemplates[id] = tableTemplate
 }
