@@ -47,15 +47,19 @@ func SelectTopoloy(w *WeaveReport, obj K8sObject) *Topology {
 
 // Compute and add the ICP link into a WeaveReport
 func AddICPLink(w *WeaveReport, obj K8sObject) {
-	latestKey, latest := GetLatest(obj)
-	weaveID, _ := GetWeaveID(obj)
-
-	tableID, tableTemplate := GetWeaveTable(obj)
-
 	top := SelectTopoloy(w, obj)
 
-	top.AddLatest(weaveID, latestKey, latest)
-	top.AddTableTemplate(tableID, tableTemplate)
+	latestID, latest := GetLatest(obj)
+	weaveID, _ := GetWeaveID(obj)
+	top.AddLatest(weaveID, latestID, latest)
+
+	// tableID, tableTemplate := GetWeaveTable(obj)
+	// top.AddTableTemplate(tableID, tableTemplate)
+
+	metaID, metaTemplate := GetWeaveMetaData(obj)
+	metaLatestID, metaLatest := GetMetaLatest(obj)
+	top.AddMetadataTemplate(metaID, metaTemplate)
+	top.AddLatest(weaveID, metaLatestID, metaLatest)
 }
 
 func (p *Plugin) GenerateReport() {

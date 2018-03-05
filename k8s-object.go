@@ -8,16 +8,18 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 )
 
-var baseUrl = GetEnv("ICP_DASHBOARD", "/console")
+const PREFIX string = "icp-link-"
+
+var BASE_URL string = GetEnv("ICP_DASHBOARD", "/console")
 
 var formatStrings = map[string]string{
-	"host":        baseUrl + "/platform/nodes/%v",            // ip
-	"deployment":  baseUrl + "/workloads/deployments/%s/%s",  // namespace, deployment
-	"daemonset":   baseUrl + "/workloads/daemonsets/%s/%s",   // namespace, daemonset
-	"service":     baseUrl + "/access/services/%s/%s",        // namespace, daemonset
-	"statefulset": baseUrl + "/workloads/statefulsets/%s/%s", // namespace, daemonset
+	"host":        BASE_URL + "/platform/nodes/%v",            // ip
+	"deployment":  BASE_URL + "/workloads/deployments/%s/%s",  // namespace, deployment
+	"daemonset":   BASE_URL + "/workloads/daemonsets/%s/%s",   // namespace, daemonset
+	"service":     BASE_URL + "/access/services/%s/%s",        // namespace, daemonset
+	"statefulset": BASE_URL + "/workloads/statefulsets/%s/%s", // namespace, daemonset
 	// "pod":        "/console/workloads/deployments/%s/%s/pods/%s", // namespace, deployment, pod
-	"pod": baseUrl + "/workloads/deployments/%s/%s/pods", // namespace, deployment, pod
+	"pod": BASE_URL + "/workloads/deployments/%s/%s/pods", // namespace, deployment, pod
 }
 
 type K8sObject interface {
@@ -78,12 +80,12 @@ func GetWeaveTable(obj K8sObject) (id string, table Table) {
 
 	table = Table{
 		ID:     "icp-link-",
-		Label:  "",
-		Prefix: "icp-link-",
+		Label:  "Cloud Private Links",
+		Prefix: PREFIX,
 		Type:   "multicolumn-table",
 		Columns: []TableColumn{{
 			ID:       "link",
-			Label:    "ICP Link",
+			Label:    "",
 			DataType: "link",
 		}},
 	}
@@ -92,11 +94,11 @@ func GetWeaveTable(obj K8sObject) (id string, table Table) {
 }
 
 func GetWeaveMetaData(obj K8sObject) (id string, metadata Metadata) {
-	id = fmt.Sprintf("%s-meta", obj.GetName())
+	id = fmt.Sprintf("%s%s-meta", PREFIX, obj.GetName())
 
 	metadata = Metadata{
 		ID:       id,
-		Label:    "Multi-Column Links",
+		Label:    "ICP Dashboard",
 		DataType: "link",
 		Priority: 0.1,
 		From:     "latest",
@@ -105,11 +107,21 @@ func GetWeaveMetaData(obj K8sObject) (id string, metadata Metadata) {
 	return
 }
 
-func GetLatest(obj K8sObject) (id string, latest LatestSample) {
+func GetMetaLatest(obj K8sObject) (id string, latest LatestSample) {
 	url, _ := GetPlatformUrl(obj)
 
 	// Meta data table ID
-	id = fmt.Sprintf("icp-link-%s___link", obj.GetName())
+	id = fmt.Sprintf("%s%s-meta", PREFIX, obj.GetName())
+	latest = LatestSample{Value: url}
+
+	return
+}
+
+func GetLatest(obj K8sObject) (id string, latest LatestSample) {
+	url, _ := GetPlatformUrl(obj)
+
+	// Multi-column table id
+	id = fmt.Sprintf("%s%s___link", PREFIX, obj.GetName())
 	latest = LatestSample{Value: url}
 
 	return
