@@ -108,7 +108,22 @@ func GetWeaveMetaData(obj K8sObject) (id string, metadata Metadata) {
 }
 
 func GetMetaLatest(obj K8sObject) (id string, latest LatestSample) {
-	url, _ := GetPlatformUrl(obj)
+	var url string
+	var ok bool
+
+	switch obj.(type) {
+	case *core_v1.Service:
+		annotations := obj.GetAnnotations()
+
+		if url, ok = annotations["adminConsoleUrl"]; ok {
+			url = annotations["adminConsoleUrl"]
+		} else {
+			url, _ = GetPlatformUrl(obj)
+		}
+
+	default:
+		url, _ = GetPlatformUrl(obj)
+	}
 
 	// Meta data table ID
 	id = fmt.Sprintf("%s%s-meta", PREFIX, obj.GetName())
