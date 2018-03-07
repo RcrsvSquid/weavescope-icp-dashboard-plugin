@@ -1,0 +1,26 @@
+sudo: required
+language: go
+
+os:
+  - linux-ppc64le
+  - linux
+
+branches:
+  only:
+    - master
+    - /^[0-9]+\..*$/
+    - /^v[0-9]+\..*$/
+    - /^release-[0-9]+\..*$/
+
+services:
+  - docker
+
+before_script:
+  - source travis-env.sh
+  - make docker-login
+
+script:
+  - make image
+
+after_success:
+- test "$TRAVIS_PULL_REQUEST" = "false" && make release || echo  "success"
