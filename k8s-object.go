@@ -32,21 +32,21 @@ type K8sObject interface {
 
 func GetPlatformUrl(obj K8sObject) (string, error) {
 	switch obj.(type) {
+	case *app_v1.DaemonSet:
+		return fmt.Sprintf(formatStrings["daemonset"], obj.GetNamespace(), obj.GetName()), nil
+
 	case *app_v1.Deployment:
 		return fmt.Sprintf(formatStrings["deployment"], obj.GetNamespace(), obj.GetName()), nil
 
-	case *app_v1.DaemonSet:
-		return fmt.Sprintf(formatStrings["daemonset"], obj.GetNamespace(), obj.GetName()), nil
+	// TODO: Fix this link
+	case *core_v1.Pod:
+		return fmt.Sprintf(formatStrings["pod"], obj.GetNamespace(), obj.GetName()), nil
 
 	case *core_v1.Service:
 		return fmt.Sprintf(formatStrings["service"], obj.GetNamespace(), obj.GetName()), nil
 
 	case *app_v1.StatefulSet:
 		return fmt.Sprintf(formatStrings["statefulset"], obj.GetNamespace(), obj.GetName()), nil
-
-	// TODO: Fix this link
-	case *core_v1.Pod:
-		return fmt.Sprintf(formatStrings["pod"], obj.GetNamespace(), obj.GetName()), nil
 
 	default:
 		return "", fmt.Errorf("No Compatible Type Found")
@@ -93,14 +93,14 @@ func GetWeaveTable(obj K8sObject) (id string, table Table) {
 	return
 }
 
-func GetWeaveMetaData(obj K8sObject) (id string, metadata Metadata) {
-	id = fmt.Sprintf("%s%s-meta", PREFIX, obj.GetName())
+func GetMetaTemplate() (id string, metadata Metadata) {
+	id = fmt.Sprintf("%s-meta", PREFIX)
 
 	metadata = Metadata{
 		ID:       id,
 		Label:    "ICP Dashboard",
 		DataType: "link",
-		Priority: 0.1,
+		Priority: 1.1,
 		From:     "latest",
 	}
 
@@ -126,7 +126,7 @@ func GetMetaLatest(obj K8sObject) (id string, latest LatestSample) {
 	}
 
 	// Meta data table ID
-	id = fmt.Sprintf("%s%s-meta", PREFIX, obj.GetName())
+	id = fmt.Sprintf("%s-meta", PREFIX)
 	latest = LatestSample{Value: url}
 
 	return

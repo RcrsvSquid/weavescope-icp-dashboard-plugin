@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	app_v1 "k8s.io/api/apps/v1"
@@ -19,10 +20,72 @@ type Plugin struct {
 	APIVersion  int      `json:"api_version,omitempty"`
 
 	Report WeaveReport
+
+	// This is a concurrently accessed data structure
+	// acquire the lock before mutating
+	sync sync.Mutex
+}
+
+func (p *Plugin) GenerateReport() {
+	startTime := time.Now()
+
+	p.Report = WeaveReport{Plugins: []PluginSpec{{
+		ID:          p.ID,
+		Label:       p.Label,
+		Description: p.Description,
+		Interfaces:  p.Interfaces,
+		APIVersion:  p.APIVersion,
+	}}}
+
+	client := GetK8sClient()
+
+	done := make(chan bool)
+
+	// Execute queries concurrently
+	for _, k8sQuery := range K8sQueries {
+		go queryWorker(client, k8sQuery, p.syncAdd, done)
+	}
+
+	// Wait for all the queries to exit
+	for range K8sQueries {
+		<-done
+	}
+
+	log.Printf("Probe finished in %v\n", time.Since(startTime))
+}
+
+func (p *Plugin) pollK8s() {
+	// Get the report before waiting
+	p.GenerateReport()
+
+	ticker := time.NewTicker(10 * time.Second)
+
+	for range ticker.C {
+		p.GenerateReport()
+	}
+}
+
+func (p *Plugin) HandleReport(w http.ResponseWriter, r *http.Request) {
+	p.sync.Lock()
+	raw, err := json.Marshal(&p.Report)
+	p.sync.Unlock()
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Fatalf("JSON Marshall Error %v", err)
+	}
+
+	Debug(func() {
+		jsonIndented, _ := PrettyFmt(raw)
+		fmt.Printf("Report\n%s\n", jsonIndented)
+	})
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(raw)
 }
 
 // Return the correct topology for a given kubernetes object
-func SelectTopoloy(w *WeaveReport, obj K8sObject) *Topology {
+func SelectTopology(w *WeaveReport, obj K8sObject) *Topology {
 	var top *Topology
 
 	switch obj.(type) {
@@ -45,78 +108,16 @@ func SelectTopoloy(w *WeaveReport, obj K8sObject) *Topology {
 	return top
 }
 
-// Compute and add the ICP link into a WeaveReport
-func AddICPLink(w *WeaveReport, obj K8sObject) {
-	top := SelectTopoloy(w, obj)
+func (p *Plugin) syncAdd(obj K8sObject) {
+	top := SelectTopology(&p.Report, obj)
 
-	latestID, latest := GetLatest(obj)
 	weaveID, _ := GetWeaveID(obj)
-	top.AddLatest(weaveID, latestID, latest)
 
-	// tableID, tableTemplate := GetWeaveTable(obj)
-	// top.AddTableTemplate(tableID, tableTemplate)
-
-	metaID, metaTemplate := GetWeaveMetaData(obj)
+	metaID, metaTemplate := GetMetaTemplate()
 	metaLatestID, metaLatest := GetMetaLatest(obj)
+
+	p.sync.Lock()
 	top.AddMetadataTemplate(metaID, metaTemplate)
 	top.AddLatest(weaveID, metaLatestID, metaLatest)
-}
-
-func (p *Plugin) GenerateReport() {
-	startTime := time.Now()
-
-	p.Report = WeaveReport{Plugins: []PluginSpec{{
-		ID:          p.ID,
-		Label:       p.Label,
-		Description: p.Description,
-		Interfaces:  p.Interfaces,
-		APIVersion:  p.APIVersion,
-	}}}
-
-	client := GetK8sClient()
-
-	do := func(k8sobject K8sObject) {
-		AddICPLink(&p.Report, k8sobject)
-	}
-
-	done := make(chan bool)
-
-	// Execute queries concurrently
-	for _, k8sQuery := range K8sQueries {
-		go func(query K8sQuery) {
-			query(client, do)
-
-			done <- true
-		}(k8sQuery)
-	}
-
-	// Wait for all the queries to exit
-	for range K8sQueries {
-		<-done
-	}
-
-	log.Printf("Probe finished in %v\n", time.Since(startTime))
-}
-
-func (p *Plugin) HandleReport(w http.ResponseWriter, r *http.Request) {
-	raw, err := json.Marshal(&p.Report)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Fatalf("JSON Marshall Error %v", err)
-	}
-
-	Debug(func() {
-		jsonIndented, _ := PrettyFmt(raw)
-		fmt.Printf("Report\n%s\n", jsonIndented)
-	})
-
-	w.WriteHeader(http.StatusOK)
-	w.Write(raw)
-}
-
-func (p *Plugin) pollK8s() {
-	for {
-		p.GenerateReport()
-		time.Sleep(10 * time.Second)
-	}
+	p.sync.Unlock()
 }

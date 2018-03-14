@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 )
 
@@ -18,6 +19,8 @@ func main() {
 		Description: "Links into the ICP Dashboard",
 		Interfaces:  []string{"reporter"},
 		APIVersion:  1,
+
+		sync: sync.Mutex{},
 	}
 
 	// We put the socket in a sub-directory to have more control on the permissions

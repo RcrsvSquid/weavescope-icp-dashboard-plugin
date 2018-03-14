@@ -6,7 +6,8 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type K8sQuery func(*kubernetes.Clientset, func(K8sObject))
+type K8sQueryHandler func(K8sObject)
+type K8sQuery func(*kubernetes.Clientset, K8sQueryHandler)
 
 var K8sQueries = [...]K8sQuery{
 	MapDaemonSets,
@@ -29,7 +30,7 @@ func GetK8sClient() *kubernetes.Clientset {
 	return client
 }
 
-func MapDaemonSets(client *kubernetes.Clientset, do func(K8sObject)) {
+func MapDaemonSets(client *kubernetes.Clientset, do K8sQueryHandler) {
 	daemonsets, _ := client.Apps().DaemonSets("").List(meta_v1.ListOptions{})
 
 	for _, k8sobject := range daemonsets.Items {
@@ -37,7 +38,7 @@ func MapDaemonSets(client *kubernetes.Clientset, do func(K8sObject)) {
 	}
 }
 
-func MapDeployments(client *kubernetes.Clientset, do func(K8sObject)) {
+func MapDeployments(client *kubernetes.Clientset, do K8sQueryHandler) {
 	deployments, _ := client.Apps().Deployments("").List(meta_v1.ListOptions{})
 
 	for _, k8sobject := range deployments.Items {
@@ -45,7 +46,7 @@ func MapDeployments(client *kubernetes.Clientset, do func(K8sObject)) {
 	}
 }
 
-func MapServices(client *kubernetes.Clientset, do func(K8sObject)) {
+func MapServices(client *kubernetes.Clientset, do K8sQueryHandler) {
 	services, _ := client.CoreV1().Services("").List(meta_v1.ListOptions{})
 
 	for _, k8sobject := range services.Items {
@@ -53,10 +54,15 @@ func MapServices(client *kubernetes.Clientset, do func(K8sObject)) {
 	}
 }
 
-func MapStatefulSets(client *kubernetes.Clientset, do func(K8sObject)) {
+func MapStatefulSets(client *kubernetes.Clientset, do K8sQueryHandler) {
 	statefulsets, _ := client.Apps().StatefulSets("").List(meta_v1.ListOptions{})
 
 	for _, k8sobject := range statefulsets.Items {
 		do(&k8sobject)
 	}
+}
+
+func queryWorker(client *kubernetes.Clientset, query K8sQuery, do K8sQueryHandler, done chan<- bool) {
+	query(client, do)
+	done <- true
 }
