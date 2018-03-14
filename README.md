@@ -1,4 +1,5 @@
-# ICP Weave Scope Plugin
+# ICP Weave Scope Plugin 
+[![Build Status](https://travis.ibm.com/IBMPrivateCloud/weavescope-icp-plugin.svg?token=FQtRyxd2oucrshZSEEqZ&branch=master)](https://travis.ibm.com/IBMPrivateCloud/weavescope-icp-plugin)
 
 A [weave scope plugin](https://www.weave.works/docs/scope/latest/plugins/) that computes links into the ICP dashboard for each kubernetes object deployed in the environment.
 
