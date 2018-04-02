@@ -1,12 +1,16 @@
 #!/bin/bash
 set -ex
 
-DOCKER_USER=ycao
+# expect $DOCKER_USER
+if [ -z ${DOCKER_USER+x} ];
+    then echo 'ERROR: $DOCKER_USER is unset'; exit 1;
+    else echo "\$DOCKER_USER='$DOCKER_USER'";
+fi
 
 TAG=${1:-latest}
-export IMAGE_NAME="$DOCKER_USER/weavescope-icp-dashboard-plugin:$TAG"
+IMAGE_NAME="$DOCKER_USER/weavescope-icp-dashboard-plugin:$TAG"
 
-docker build -t $IMAGE_NAME .
+docker build --rm -t $IMAGE_NAME .
 docker push $IMAGE_NAME
 
 # kubectl delete -f deploy.yml
