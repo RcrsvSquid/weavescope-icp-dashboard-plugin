@@ -5,6 +5,7 @@ metadata:
     app: weavescope
     weavescope-component: weavescope-icp-dashboard-plugin
   name: weavescope-icp-dashboard-plugin
+  namespace: weave
 spec:
   replicas: 1
   template:
@@ -30,10 +31,12 @@ spec:
                 configMapKeyRef:
                   name: icp-dashboard
                   key: dashboard-link
+            - name: DEBUG
+              value: "false"
 
       volumes:
       - name: scope-plugins
         hostPath:
           path: /var/run/scope/plugins
       imagePullSecrets:
-        - name: regsecret
+        - name: bxregsec

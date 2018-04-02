@@ -1,0 +1,24 @@
+[
+    {
+        "annotations": {
+            "adminConsole": "http://somewhere.com:30800"
+        },
+        "labels": {
+            "app": "testing"
+        },
+        "name": "test-deployment",
+        "namespace": "default",
+        "uid": "12345"
+    },
+    {
+        "annotations": {
+            "adminConsole": "http://awebsite.com:32800"
+        },
+        "labels": {
+            "app": "testing"
+        },
+        "name": "test-kubernetes-object",
+        "namespace": "default",
+        "uid": "67890"
+    }
+]
